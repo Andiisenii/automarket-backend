@@ -7,7 +7,17 @@ const app = express()
 
 // CORS - allow frontend origin
 app.use(cors({
-  origin: ['https://automarket-slovenia.vercel.app', 'http://localhost:5173'],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    // Allow all vercel app domains and localhost
+    if (origin.endsWith('.vercel.app') || 
+        origin.includes('localhost') ||
+        origin.includes('automarket-slovenia')) {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Pinggy-No-Screen'],
   credentials: true
