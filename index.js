@@ -10,6 +10,11 @@ app.use(express.json())
 // Supabase client
 const supabaseUrl = process.env.SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Missing SUPABASE_URL or SUPABASE_KEY environment variables')
+}
+
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 // ============ AUTH ============
@@ -248,5 +253,19 @@ app.get('/api/cities.php', async (req, res) => {
   return res.json({ success: true, cities })
 })
 
-const PORT = process.env.PORT || 3000
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
+// ============ HEALTH CHECK ============
+app.get('/api/health.php', async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('users').select('id').limit(1)
+    return res.json({ 
+      status: 'ok', 
+      supabase: error ? 'error: ' + error.message : 'connected',
+      timestamp: new Date().toISOString()
+    })
+  } catch (err) {
+    return res.json({ status: 'error', message: err.message })
+  }
+})
+
+// Export for Vercel - THIS IS THE KEY FIX
+export default app
