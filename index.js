@@ -7,12 +7,10 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
-// Supabase client - lazy initialization
-const supabaseUrl = process.env.SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_KEY
-
-// Helper to get supabase client (lazy)
+// Supabase client - read from env on each call (for Vercel serverless)
 function getSupabase() {
+  const supabaseUrl = process.env.SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_KEY
   if (!supabaseUrl || !supabaseKey) {
     throw new Error('Missing SUPABASE_URL or SUPABASE_KEY environment variables')
   }
