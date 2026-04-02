@@ -7,22 +7,24 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
-// Supabase client
+// Supabase client - lazy initialization
 const supabaseUrl = process.env.SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_KEY
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing SUPABASE_URL or SUPABASE_KEY environment variables')
+// Helper to get supabase client (lazy)
+function getSupabase() {
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing SUPABASE_URL or SUPABASE_KEY environment variables')
+  }
+  return createClient(supabaseUrl, supabaseKey)
 }
-
-const supabase = createClient(supabaseUrl, supabaseKey)
 
 // ============ AUTH ============
 app.post('/api/auth.php', async (req, res) => {
   const { action, email, password, name, phone, role, userType } = req.body
 
   if (action === 'login') {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('users')
       .select('*')
       .eq('email', email)
@@ -46,7 +48,7 @@ app.post('/api/auth.php', async (req, res) => {
   }
 
   if (action === 'register') {
-    const { data: existing } = await supabase
+    const { data: existing } = await getSupabase()
       .from('users')
       .select('id')
       .eq('email', email)
@@ -58,7 +60,7 @@ app.post('/api/auth.php', async (req, res) => {
     
     const hashedPassword = await bcrypt.hash(password, 10)
     
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('users')
       .insert({
         name,
@@ -86,7 +88,7 @@ app.post('/api/auth.php', async (req, res) => {
 
 // ============ CARS ============
 app.get('/api/cars.php', async (req, res) => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('cars')
     .select('*')
     .order('created_at', { ascending: false })
@@ -100,7 +102,7 @@ app.get('/api/cars.php', async (req, res) => {
 app.post('/api/cars.php', async (req, res) => {
   const { user_id, ...carData } = req.body
   
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('cars')
     .insert({ ...carData, user_id })
     .select()
@@ -115,7 +117,7 @@ app.post('/api/cars.php', async (req, res) => {
 app.put('/api/cars.php', async (req, res) => {
   const { id, ...carData } = req.body
   
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('cars')
     .update(carData)
     .eq('id', id)
@@ -131,7 +133,7 @@ app.put('/api/cars.php', async (req, res) => {
 app.delete('/api/cars.php', async (req, res) => {
   const { id } = req.body
   
-  const { error } = await supabase
+  const { error } = await getSupabase()
     .from('cars')
     .delete()
     .eq('id', id)
@@ -144,7 +146,7 @@ app.delete('/api/cars.php', async (req, res) => {
 
 // ============ PACKAGES ============
 app.get('/api/packages.php', async (req, res) => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('packages')
     .select('*')
     .eq('is_active', true)
@@ -161,12 +163,12 @@ app.get('/api/admin.php', async (req, res) => {
   const { action } = req.query
   
   if (action === 'users') {
-    const { data } = await supabase.from('users').select('*').order('created_at', { ascending: false })
+    const { data } = await getSupabase().from('users').select('*').order('created_at', { ascending: false })
     return res.json({ success: true, users: data || [] })
   }
   
   if (action === 'cars') {
-    const { data } = await supabase
+    const { data } = await getSupabase()
       .from('cars')
       .select('*, users:name(name)')
       .order('created_at', { ascending: false })
@@ -174,13 +176,13 @@ app.get('/api/admin.php', async (req, res) => {
   }
   
   if (action === 'packages') {
-    const { data } = await supabase.from('packages').select('*').order('sort_order')
+    const { data } = await getSupabase().from('packages').select('*').order('sort_order')
     return res.json({ success: true, packages: data || [] })
   }
   
   if (action === 'analytics') {
-    const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true })
-    const { count: totalCars } = await supabase.from('cars').select('*', { count: 'exact', head: true })
+    const { count: totalUsers } = await getSupabase().from('users').select('*', { count: 'exact', head: true })
+    const { count: totalCars } = await getSupabase().from('cars').select('*', { count: 'exact', head: true })
     
     return res.json({
       success: true,
@@ -203,7 +205,7 @@ app.post('/api/admin.php', async (req, res) => {
   if (action === 'update_package') {
     const { id, name, name_en, price, min_days, discount, discount_active } = input
     
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('packages')
       .update({
         name,
@@ -253,10 +255,28 @@ app.get('/api/cities.php', async (req, res) => {
   return res.json({ success: true, cities })
 })
 
+// ============ DEBUG ============
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'ok',
+    supabaseUrl: supabaseUrl ? 'SET' : 'MISSING',
+    supabaseKey: supabaseKey ? 'SET' : 'MISSING',
+    timestamp: new Date().toISOString()
+  })
+})
+
 // ============ HEALTH CHECK ============
 app.get('/api/health.php', async (req, res) => {
+  if (!supabaseUrl || !supabaseKey) {
+    return res.json({ 
+      status: 'error', 
+      message: 'Environment variables missing',
+      supabaseUrl: supabaseUrl || 'MISSING',
+      supabaseKey: supabaseKey ? 'SET' : 'MISSING'
+    })
+  }
   try {
-    const { data, error } = await supabase.from('users').select('id').limit(1)
+    const { data, error } = await getSupabase().from('users').select('id').limit(1)
     return res.json({ 
       status: 'ok', 
       supabase: error ? 'error: ' + error.message : 'connected',
@@ -269,3 +289,4 @@ app.get('/api/health.php', async (req, res) => {
 
 // Export for Vercel - THIS IS THE KEY FIX
 export default app
+
