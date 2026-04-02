@@ -4,7 +4,15 @@ import { createClient } from '@supabase/supabase-js'
 import bcrypt from 'bcryptjs'
 
 const app = express()
-app.use(cors())
+
+// CORS - allow frontend origin
+app.use(cors({
+  origin: ['https://automarket-slovenia.vercel.app', 'http://localhost:5173'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Pinggy-No-Screen'],
+  credentials: true
+}))
+
 app.use(express.json())
 
 // Supabase client - read from env on each call (for Vercel serverless)
