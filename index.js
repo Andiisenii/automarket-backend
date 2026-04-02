@@ -255,22 +255,26 @@ app.get('/api/cities.php', async (req, res) => {
 
 // ============ DEBUG ============
 app.get('/', (req, res) => {
+  const su = process.env.SUPABASE_URL
+  const sk = process.env.SUPABASE_KEY
   res.json({ 
     status: 'ok',
-    supabaseUrl: supabaseUrl ? 'SET' : 'MISSING',
-    supabaseKey: supabaseKey ? 'SET' : 'MISSING',
+    supabaseUrl: su ? 'SET' : 'MISSING',
+    supabaseKey: sk ? 'SET' : 'MISSING',
     timestamp: new Date().toISOString()
   })
 })
 
 // ============ HEALTH CHECK ============
 app.get('/api/health.php', async (req, res) => {
-  if (!supabaseUrl || !supabaseKey) {
+  const su = process.env.SUPABASE_URL
+  const sk = process.env.SUPABASE_KEY
+  if (!su || !sk) {
     return res.json({ 
       status: 'error', 
       message: 'Environment variables missing',
-      supabaseUrl: supabaseUrl || 'MISSING',
-      supabaseKey: supabaseKey ? 'SET' : 'MISSING'
+      supabaseUrl: su || 'MISSING',
+      supabaseKey: sk ? 'SET' : 'MISSING'
     })
   }
   try {
